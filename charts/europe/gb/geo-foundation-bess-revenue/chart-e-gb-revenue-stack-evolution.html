@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GB BESS revenue stack evolution</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.12.7/Recharts.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --dm-bg: #FFFFFF; --dm-text: #333333; --dm-text2: #4a4a4a;
+      --dm-muted: #AAAAAA; --dm-border: #E8E8E8; --dm-grid: #F0F0F0;
+      --dm-tooltip-bg: #333333; --dm-tooltip-text: #FFFFFF; --dm-accent: #6F5FE5;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --dm-bg: #1a1a1a; --dm-text: #d4d4d4; --dm-text2: #a0a0a0;
+        --dm-muted: #888888; --dm-border: #2e2e2e; --dm-grid: #2e2e2e;
+        --dm-tooltip-bg: #2a2a2a; --dm-tooltip-text: #d4d4d4; --dm-accent: #B7AFF2;
+      }
+    }
+    html, body { width: 100%; height: 100%; overflow: hidden;
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--dm-bg); color: var(--dm-text); }
+    #root { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine } = Recharts;
+    var e = React.createElement;
+    var useState = React.useState;
+    var useEffect = React.useEffect;
+
+    function useDarkMode() {
+      var s = useState(window.matchMedia('(prefers-color-scheme: dark)').matches);
+      var dark = s[0]; var setDark = s[1];
+      useEffect(function() {
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        function onChange(ev) { setDark(ev.matches); }
+        mq.addEventListener('change', onChange);
+        return function() { mq.removeEventListener('change', onChange); };
+      }, []);
+      return dark;
+    }
+    function useWindowSize() {
+      var s = useState({ width: window.innerWidth, height: window.innerHeight });
+      var size = s[0]; var setSize = s[1];
+      useEffect(function() {
+        function onResize() { setSize({ width: window.innerWidth, height: window.innerHeight }); }
+        window.addEventListener("resize", onResize);
+        return function() { window.removeEventListener("resize", onResize); };
+      }, []);
+      return size;
+    }
+
+    // === DATA ===
+    // GB monthly BESS revenue stack (£/MW/year annualised, 2-hour battery).
+    // Source: Modo Energy ME BESS GB Index.
+    // Streams: wholesale = day-ahead/intraday energy; balancing = BM + imbalance; ancillary = sum of all freq/regulation/reserve products (net of DRH costs); capacity = CM.
+    // Ancillary dips below zero during the GB 2024 DRH cost-burden period; PQR/NQR launched late 2024 and ancillary recovered.
+    var data = [
+      { date: "Jan '23", wholesale: 43822, balancing: 1917,  ancillary: 35376, capacity: 22121 },
+      { date: "Feb '23", wholesale: 30139, balancing: -3485, ancillary: 30231, capacity: 18147 },
+      { date: "Mar '23", wholesale: 28721, balancing: -285,  ancillary: 43018, capacity: 16768 },
+      { date: "Apr '23", wholesale: 13623, balancing: 5230,  ancillary: 52132, capacity: 14601 },
+      { date: "May '23", wholesale: 8236,  balancing: 5283,  ancillary: 41825, capacity: 11407 },
+      { date: "Jun '23", wholesale: 9501,  balancing: 4054,  ancillary: 39968, capacity: 10065 },
+      { date: "Jul '23", wholesale: 15671, balancing: 641,   ancillary: 67184, capacity: 9624 },
+      { date: "Aug '23", wholesale: 13665, balancing: 5094,  ancillary: 29538, capacity: 9670 },
+      { date: "Sep '23", wholesale: 24734, balancing: 3595,  ancillary: 27719, capacity: 8031 },
+      { date: "Oct '23", wholesale: 32687, balancing: 6408,  ancillary: 32441, capacity: 18251 },
+      { date: "Nov '23", wholesale: 31959, balancing: 4084,  ancillary: 8298,  capacity: 18253 },
+      { date: "Dec '23", wholesale: 25627, balancing: 5605,  ancillary: 6330,  capacity: 19874 },
+      { date: "Jan '24", wholesale: 24959, balancing: 7548,  ancillary: -7354, capacity: 19688 },
+      { date: "Feb '24", wholesale: 24347, balancing: 9847,  ancillary: -7071, capacity: 17930 },
+      { date: "Mar '24", wholesale: 24685, balancing: 12594, ancillary: 1983,  capacity: 17384 },
+      { date: "Apr '24", wholesale: 22806, balancing: 19207, ancillary: 12831, capacity: 14970 },
+      { date: "May '24", wholesale: 20232, balancing: 19085, ancillary: -3579, capacity: 13866 },
+      { date: "Jun '24", wholesale: 20340, balancing: 18785, ancillary: 8931,  capacity: 12856 },
+      { date: "Jul '24", wholesale: 24045, balancing: 9013,  ancillary: 1156,  capacity: 12892 },
+      { date: "Aug '24", wholesale: 30244, balancing: 19166, ancillary: 5546,  capacity: 13031 },
+      { date: "Sep '24", wholesale: 27422, balancing: 12528, ancillary: -92,   capacity: 14083 },
+      { date: "Oct '24", wholesale: 40072, balancing: 17255, ancillary: 1324,  capacity: 8181 },
+      { date: "Nov '24", wholesale: 36488, balancing: 17877, ancillary: -3165, capacity: 8958 },
+      { date: "Dec '24", wholesale: 35230, balancing: 35212, ancillary: 26322, capacity: 8615 },
+      { date: "Jan '25", wholesale: 55327, balancing: 13426, ancillary: 28045, capacity: 8481 },
+      { date: "Feb '25", wholesale: 11631, balancing: 46886, ancillary: 22542, capacity: 8116 },
+      { date: "Mar '25", wholesale: 40347, balancing: 20517, ancillary: 19551, capacity: 7746 },
+      { date: "Apr '25", wholesale: 46754, balancing: 7678,  ancillary: 19539, capacity: 6836 },
+      { date: "May '25", wholesale: 42907, balancing: 6570,  ancillary: 21754, capacity: 6173 },
+      { date: "Jun '25", wholesale: 43405, balancing: 20255, ancillary: 21178, capacity: 6171 },
+      { date: "Jul '25", wholesale: 28532, balancing: 14740, ancillary: 14999, capacity: 6006 },
+      { date: "Aug '25", wholesale: 30906, balancing: 16947, ancillary: 15846, capacity: 5849 },
+      { date: "Sep '25", wholesale: 27605, balancing: 21147, ancillary: 26938, capacity: 5446 },
+      { date: "Oct '25", wholesale: 22758, balancing: 25469, ancillary: 31935, capacity: 7814 },
+      { date: "Nov '25", wholesale: 12464, balancing: 20436, ancillary: 26766, capacity: 9009 },
+      { date: "Dec '25", wholesale: 13747, balancing: 17935, ancillary: 16525, capacity: 9407 },
+      { date: "Jan '26", wholesale: 10305, balancing: 27558, ancillary: 15800, capacity: 9587 },
+      { date: "Feb '26", wholesale: -6247, balancing: 34907, ancillary: 11459, capacity: 9038 },
+      { date: "Mar '26", wholesale: -1694, balancing: 64943, ancillary: 16050, capacity: 8083 },
+      { date: "Apr '26", wholesale: 36494, balancing: 20331, ancillary: 16628, capacity: 6864 }
+    ];
+
+    var SERIES = [
+      { key: "wholesale", label: "Wholesale energy",   color: "#E59C58" },
+      { key: "balancing", label: "Balancing markets",  color: "#E8CB00" },
+      { key: "ancillary", label: "Ancillary services", color: "#467EE4" },
+      { key: "capacity",  label: "Capacity payments",  color: "#27AC60" }
+    ];
+
+    function getColors(dark) {
+      return {
+        text: dark ? "#d4d4d4" : "#333333",
+        text2: dark ? "#a0a0a0" : "#4a4a4a",
+        muted: dark ? "#888888" : "#AAAAAA",
+        bg: dark ? "#1a1a1a" : "#FFFFFF",
+        grid: dark ? "#2e2e2e" : "#F0F0F0",
+        border: dark ? "#2e2e2e" : "#E8E8E8",
+        tooltipBg: dark ? "#2a2a2a" : "#333333",
+        tooltipText: dark ? "#d4d4d4" : "#FFFFFF",
+        accent: dark ? "#B7AFF2" : "#6F5FE5"
+      };
+    }
+
+    function downloadCSV(data, filename) {
+      if (!data || !data.length) return;
+      var keys = ["date","wholesale","balancing","ancillary","capacity"];
+      var csv = keys.join(',') + '\n';
+      data.forEach(function(row) { csv += keys.map(function(k){ return row[k]; }).join(',') + '\n'; });
+      var blob = new Blob([csv], { type: 'text/csv' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url;
+      a.download = (filename || 'chart-data') + '.csv'; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function ModoTooltip(props) {
+      if (!props.active || !props.payload || !props.payload.length) return null;
+      var colors = props.colors || getColors(false);
+      // Sum visible streams for "Total"
+      var total = props.payload.reduce(function(s, p){ return s + (p.value || 0); }, 0);
+      return e("div", {
+        style: { backgroundColor: colors.tooltipBg, padding: "8px 12px", borderRadius: 6,
+          fontFamily: "'DM Sans', sans-serif", maxWidth: 260, border: "1px solid " + colors.border }
+      },
+        e("p", { style: { fontSize: 11, color: colors.muted, marginBottom: 6, fontWeight: 500 } }, props.label),
+        props.payload.map(function(entry, i) {
+          return e("p", { key: i, style: { fontSize: 11, color: colors.tooltipText, lineHeight: 1.6 } },
+            e("span", { style: { color: entry.color } }, "● "),
+            entry.name + ": £" + Math.round(entry.value).toLocaleString()
+          );
+        }),
+        e("p", { style: { fontSize: 11, color: colors.tooltipText, lineHeight: 1.6,
+          borderTop: "1px solid " + colors.border, marginTop: 4, paddingTop: 4 } },
+          "Total: £" + Math.round(total).toLocaleString() + "/MW/yr")
+      );
+    }
+
+    function ModoChart() {
+      var w = useWindowSize().width;
+      var mob = w < 640;
+      var tab = w >= 640 && w < 1024;
+      var dark = useDarkMode();
+      var c = getColors(dark);
+
+      var hiddenState = useState({});
+      var hidden = hiddenState[0]; var setHidden = hiddenState[1];
+
+      var fs = {
+        header: mob ? 15 : tab ? 18 : 21,
+        sub: mob ? 11 : tab ? 13 : 14,
+        xTick: mob ? 9 : tab ? 10 : 11,
+        yTick: mob ? 9 : tab ? 10 : 11,
+        annotation: mob ? 9 : tab ? 10 : 11,
+        legend: mob ? 10 : tab ? 11 : 12,
+        footer: mob ? 9 : tab ? 10 : 11,
+        wordmark: mob ? 14 : tab ? 18 : 22
+      };
+      var margin = mob ? { top: 10, right: 12, left: 0, bottom: 5 }
+        : tab ? { top: 12, right: 18, left: 5, bottom: 5 }
+        : { top: 15, right: 24, left: 10, bottom: 5 };
+      var pad = mob ? "12px 10px 8px 10px" : tab ? "18px 20px 12px 20px" : "24px 28px 16px 28px";
+
+      function onLegendClick(o) {
+        var k = o && o.dataKey;
+        if (k) { var next = Object.assign({}, hidden); next[k] = !next[k]; setHidden(next); }
+      }
+      function legendFormatter(value, entry) {
+        var k = entry && entry.dataKey;
+        var isHidden = !!(k && hidden[k]);
+        return e("span", {
+          style: { color: isHidden ? c.muted : c.text,
+            textDecoration: isHidden ? "line-through" : "none",
+            cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }
+        }, value);
+      }
+
+      // Show every 6th x-axis tick on desktop, every 12th on mobile, to avoid overlap
+      var xTickInterval = mob ? 11 : tab ? 5 : 5;
+
+      return e("div", {
+        style: { display: "flex", flexDirection: "column", width: "100%", height: "100%",
+          padding: pad, fontFamily: "'DM Sans', sans-serif", background: c.bg }
+      },
+        e("div", { style: { marginBottom: mob ? 4 : 8 } },
+          e("h1", { style: { fontSize: fs.header, fontWeight: 400, color: c.text, lineHeight: 1.3 } },
+            "How has the GB battery revenue stack shifted over the past three years?"),
+          e("p", { style: { fontSize: fs.sub, color: c.text2, marginTop: mob ? 3 : 6 } },
+            "Monthly GB BESS revenue composition for a 2-hour battery, annualised £/MW/year, January 2023 – April 2026")
+        ),
+
+        e("div", { style: { flex: 1, minHeight: 0 } },
+          e(ResponsiveContainer, { width: "100%", height: "100%" },
+            e(AreaChart, { data: data, margin: margin, stackOffset: "none" },
+              e(CartesianGrid, { horizontal: true, vertical: false, stroke: c.grid }),
+              e(XAxis, { dataKey: "date",
+                tick: { fontSize: fs.xTick, fill: c.text2, fontFamily: "'DM Sans', sans-serif" },
+                axisLine: { stroke: c.border }, tickLine: false,
+                interval: xTickInterval }),
+              e(YAxis, {
+                tick: { fontSize: fs.yTick, fill: c.text2, fontFamily: "'DM Sans', sans-serif" },
+                axisLine: false, tickLine: false,
+                tickFormatter: function(v) { return "£" + (v/1000) + "k"; },
+                domain: ['auto', 'auto'],
+                width: mob ? 42 : 50 }),
+              e(ReferenceLine, { y: 0, stroke: c.border, strokeDasharray: "0" }),
+              e(Tooltip, { content: e(ModoTooltip, { colors: c }),
+                cursor: { stroke: c.muted, strokeWidth: 1, strokeDasharray: "3 3" } }),
+              e(Legend, {
+                verticalAlign: "top", align: "left",
+                iconType: "square", iconSize: mob ? 8 : 10,
+                onClick: onLegendClick, formatter: legendFormatter,
+                wrapperStyle: { fontFamily: "'DM Sans', sans-serif",
+                  fontSize: fs.legend, paddingBottom: 12, cursor: "pointer" }
+              }),
+              SERIES.map(function(s) {
+                return e(Area, {
+                  key: s.key,
+                  dataKey: s.key, name: s.label,
+                  type: "linear",
+                  stackId: "1",
+                  fill: s.color, stroke: s.color, fillOpacity: 0.75,
+                  hide: !!hidden[s.key],
+                  animationDuration: 800, animationEasing: "ease-in-out"
+                });
+              })
+            )
+          )
+        ),
+
+        e("div", {
+          style: { display: "flex", justifyContent: "space-between",
+            alignItems: mob ? "flex-start" : "flex-end",
+            flexDirection: mob ? "column" : "row",
+            gap: mob ? 6 : 0, marginTop: 8, paddingTop: 8,
+            borderTop: "1px solid " + c.border }
+        },
+          e("div", { style: { flex: 1 } },
+            e("p", { style: { fontSize: fs.footer, color: c.muted } },
+              "Source: Modo Energy ME BESS GB Index (2-hour basis), monthly values annualised in £/MW/year."),
+            e("p", { style: { fontSize: fs.footer, color: c.muted, marginTop: 2 } },
+              "Note: Balancing markets covers the GB Balancing Mechanism plus imbalance. Ancillary dips below zero in early 2024 due to Dynamic Regulation High (DRH) cost burden during the product transition; recovery from late 2024 reflects PQR/NQR product launches."),
+            e("button", {
+              onClick: function() { downloadCSV(data, "gb-bess-revenue-stack-evolution"); },
+              style: { fontFamily: "'DM Sans', sans-serif", fontSize: fs.footer,
+                fontWeight: 500, color: c.accent, background: "none",
+                border: "none", outline: "none", boxShadow: "none",
+                padding: 0, cursor: "pointer", marginTop: 4,
+                display: "inline-flex", alignItems: "center", gap: 4 }
+            },
+              e("svg", { width: 12, height: 12, viewBox: "0 0 24 24",
+                fill: "none", stroke: "currentColor", strokeWidth: 2,
+                strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true },
+                e("path", { d: "M12 4v14m0 0l-6-6m6 6l6-6" })
+              ),
+              "Download data"
+            )
+          ),
+          e("span", {
+            style: { fontSize: fs.wordmark, fontWeight: 700,
+              letterSpacing: "0.25em", color: c.text, whiteSpace: "nowrap",
+              alignSelf: mob ? "flex-end" : "auto" }
+          }, "MODOENERGY")
+        )
+      );
+    }
+
+    (function() {
+      var rendered = false;
+      var observer = new IntersectionObserver(function(entries) {
+        if (entries[0].isIntersecting && !rendered) {
+          rendered = true; observer.disconnect();
+          ReactDOM.createRoot(document.getElementById('root')).render(e(ModoChart));
+        }
+      }, { threshold: 0.1 });
+      observer.observe(document.getElementById('root'));
+    })();
+  </script>
+</body>
+</html>

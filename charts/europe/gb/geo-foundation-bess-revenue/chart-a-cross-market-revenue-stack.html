@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cross-market BESS revenue mix</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.12.7/Recharts.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --dm-bg: #FFFFFF; --dm-text: #333333; --dm-text2: #4a4a4a;
+      --dm-muted: #AAAAAA; --dm-border: #E8E8E8; --dm-grid: #E8E8E8;
+      --dm-tooltip-bg: #333333; --dm-tooltip-text: #FFFFFF; --dm-accent: #5B3FE8;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --dm-bg: #1a1a1a; --dm-text: #d4d4d4; --dm-text2: #a0a0a0;
+        --dm-muted: #888888; --dm-border: #2e2e2e; --dm-grid: #2e2e2e;
+        --dm-tooltip-bg: #2a2a2a; --dm-tooltip-text: #d4d4d4; --dm-accent: #7B6FE8;
+      }
+    }
+    html, body { width: 100%; height: 100%; overflow: hidden;
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--dm-bg); color: var(--dm-text); }
+    #root { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LabelList } = Recharts;
+    var e = React.createElement;
+    var useState = React.useState;
+    var useEffect = React.useEffect;
+
+    function useDarkMode() {
+      var s = useState(window.matchMedia('(prefers-color-scheme: dark)').matches);
+      var dark = s[0]; var setDark = s[1];
+      useEffect(function() {
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        function onChange(ev) { setDark(ev.matches); }
+        mq.addEventListener('change', onChange);
+        return function() { mq.removeEventListener('change', onChange); };
+      }, []);
+      return dark;
+    }
+
+    function useWindowSize() {
+      var s = useState({ width: window.innerWidth, height: window.innerHeight });
+      var size = s[0]; var setSize = s[1];
+      useEffect(function() {
+        function onResize() { setSize({ width: window.innerWidth, height: window.innerHeight }); }
+        window.addEventListener("resize", onResize);
+        return function() { window.removeEventListener("resize", onResize); };
+      }, []);
+      return size;
+    }
+
+    // === DATA ===
+    // Source: Modo Energy ME BESS Indices, trailing-12mo May 2025–April 2026 (ERCOT computed Mar 2025–Mar 2026 due to 60-day lag).
+    // GB breakdown: wholesale = DA+ID energy markets (30%); balancing = BM + imbalance (33%); ancillary = sum of all freq/regulation/reserve products (27%); CM = 10%.
+    // Germany is indicative — the market lacks a single equivalent index.
+    // CAISO Resource Adequacy is bilateral and outside the ME BESS Index — surfaced via footer note rather than estimate.
+    var data = [
+      { market: "ERCOT",     wholesale: 72, balancing: 0,  ancillary: 28, capacity: 0,  other: 0, indicative: false },
+      { market: "CAISO",     wholesale: 90, balancing: 0,  ancillary: 10, capacity: 0,  other: 0, indicative: false },
+      { market: "GB",        wholesale: 30, balancing: 33, ancillary: 27, capacity: 10, other: 0, indicative: false },
+      { market: "Germany*",  wholesale: 70, balancing: 0,  ancillary: 25, capacity: 0,  other: 5, indicative: true }
+    ];
+
+    var SERIES = [
+      { key: "wholesale", label: "Wholesale energy",       color: "#E59C58" },
+      { key: "balancing", label: "Balancing markets",      color: "#E8CB00" },
+      { key: "ancillary", label: "Ancillary services",     color: "#467EE4" },
+      { key: "capacity",  label: "Capacity payments",      color: "#27AC60" },
+      { key: "other",     label: "Other",                  color: "#AAAAAA" }
+    ];
+
+    function getColors(dark) {
+      return {
+        text: dark ? "#d4d4d4" : "#333333",
+        text2: dark ? "#a0a0a0" : "#4a4a4a",
+        muted: dark ? "#888888" : "#AAAAAA",
+        bg: dark ? "#1a1a1a" : "#FFFFFF",
+        grid: dark ? "#2e2e2e" : "#F0F0F0",
+        border: dark ? "#2e2e2e" : "#E8E8E8",
+        tooltipBg: dark ? "#2a2a2a" : "#333333",
+        tooltipText: dark ? "#d4d4d4" : "#FFFFFF",
+        accent: dark ? "#B7AFF2" : "#6F5FE5"
+      };
+    }
+
+    function downloadCSV(data, filename) {
+      if (!data || !data.length) return;
+      var keys = ["market","wholesale","balancing","ancillary","capacity","other"];
+      var csv = keys.join(',') + '\n';
+      data.forEach(function(row) {
+        csv += keys.map(function(k) { return row[k]; }).join(',') + '\n';
+      });
+      var blob = new Blob([csv], { type: 'text/csv' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = (filename || 'chart-data') + '.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function ModoTooltip(props) {
+      if (!props.active || !props.payload || !props.payload.length) return null;
+      var colors = props.colors || getColors(false);
+      // Filter out hidden series and zero values for clarity
+      var visible = props.payload.filter(function(p) { return p.value > 0; });
+      return e("div", {
+        style: {
+          backgroundColor: colors.tooltipBg,
+          padding: "8px 12px",
+          borderRadius: 6,
+          fontFamily: "'DM Sans', sans-serif",
+          maxWidth: 240,
+          border: "1px solid " + colors.border
+        }
+      },
+        e("p", { style: { fontSize: 11, color: colors.muted, marginBottom: 6, fontWeight: 500 } }, props.label),
+        visible.map(function(entry, i) {
+          return e("p", { key: i, style: { fontSize: 11, color: colors.tooltipText, lineHeight: 1.6 } },
+            e("span", { style: { color: entry.color } }, "● "),
+            entry.name + ": " + entry.value + "%"
+          );
+        })
+      );
+    }
+
+    function ModoChart() {
+      var w = useWindowSize().width;
+      var mob = w < 640;
+      var tab = w >= 640 && w < 1024;
+      var dark = useDarkMode();
+      var c = getColors(dark);
+
+      var hiddenState = useState({});
+      var hidden = hiddenState[0];
+      var setHidden = hiddenState[1];
+
+      var fs = {
+        header: mob ? 15 : tab ? 18 : 21,
+        sub: mob ? 11 : tab ? 13 : 14,
+        xTick: mob ? 10 : tab ? 11 : 12,
+        yTick: mob ? 11 : tab ? 12 : 13,
+        legend: mob ? 10 : tab ? 11 : 12,
+        footer: mob ? 9 : tab ? 10 : 11,
+        wordmark: mob ? 14 : tab ? 18 : 22
+      };
+
+      var margin = mob
+        ? { top: 10, right: 24, left: 0, bottom: 5 }
+        : tab
+        ? { top: 12, right: 32, left: 0, bottom: 5 }
+        : { top: 15, right: 40, left: 0, bottom: 5 };
+      var pad = mob ? "12px 10px 8px 10px" : tab ? "18px 20px 12px 20px" : "24px 28px 16px 28px";
+
+      function onLegendClick(o) {
+        var k = o && o.dataKey;
+        if (k) {
+          var next = Object.assign({}, hidden);
+          next[k] = !next[k];
+          setHidden(next);
+        }
+      }
+      function legendFormatter(value, entry) {
+        var k = entry && entry.dataKey;
+        var isHidden = !!(k && hidden[k]);
+        return e("span", {
+          style: {
+            color: isHidden ? c.muted : c.text,
+            textDecoration: isHidden ? "line-through" : "none",
+            cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif"
+          }
+        }, value);
+      }
+
+      return e("div", {
+        style: {
+          display: "flex", flexDirection: "column",
+          width: "100%", height: "100%",
+          padding: pad,
+          fontFamily: "'DM Sans', sans-serif",
+          background: c.bg
+        }
+      },
+        // Header
+        e("div", { style: { marginBottom: mob ? 4 : 8 } },
+          e("h1", { style: { fontSize: fs.header, fontWeight: 400, color: c.text, lineHeight: 1.3 } },
+            "How does a battery's revenue mix differ across major markets?"),
+          e("p", { style: { fontSize: fs.sub, color: c.text2, marginTop: mob ? 3 : 6 } },
+            "BESS revenue composition, % of total, trailing twelve months")
+        ),
+
+        // Chart
+        e("div", { style: { flex: 1, minHeight: 0 } },
+          e(ResponsiveContainer, { width: "100%", height: "100%" },
+            e(BarChart, { data: data, layout: "vertical", margin: margin, barCategoryGap: "20%" },
+              e(CartesianGrid, { horizontal: false, vertical: true, stroke: c.grid }),
+              e(XAxis, {
+                type: "number",
+                domain: [0, 100],
+                ticks: [0, 20, 40, 60, 80, 100],
+                tickFormatter: function(v) { return v + "%"; },
+                tick: { fontSize: fs.xTick, fill: c.text2, fontFamily: "'DM Sans', sans-serif" },
+                axisLine: false,
+                tickLine: false
+              }),
+              e(YAxis, {
+                type: "category",
+                dataKey: "market",
+                tick: { fontSize: fs.yTick, fill: c.text, fontFamily: "'DM Sans', sans-serif" },
+                axisLine: { stroke: c.border },
+                tickLine: false,
+                width: mob ? 70 : 90
+              }),
+              e(Tooltip, {
+                content: e(ModoTooltip, { colors: c }),
+                cursor: { fill: dark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)" }
+              }),
+              e(Legend, {
+                verticalAlign: "top",
+                align: "left",
+                iconType: "square",
+                iconSize: mob ? 8 : 10,
+                onClick: onLegendClick,
+                formatter: legendFormatter,
+                wrapperStyle: {
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: fs.legend,
+                  paddingBottom: 12,
+                  cursor: "pointer"
+                }
+              }),
+              SERIES.map(function(s, i) {
+                var isLast = i === SERIES.length - 1;
+                return e(Bar, {
+                  key: s.key,
+                  dataKey: s.key,
+                  name: s.label,
+                  stackId: "stack",
+                  fill: s.color,
+                  hide: !!hidden[s.key],
+                  radius: isLast ? [0, 2, 2, 0] : [0, 0, 0, 0],
+                  animationDuration: 800,
+                  animationEasing: "ease-in-out"
+                });
+              })
+            )
+          )
+        ),
+
+        // Footer
+        e("div", {
+          style: {
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: mob ? "flex-start" : "flex-end",
+            flexDirection: mob ? "column" : "row",
+            gap: mob ? 6 : 0,
+            marginTop: 8,
+            paddingTop: 8,
+            borderTop: "1px solid " + c.border
+          }
+        },
+          e("div", { style: { flex: 1 } },
+            e("p", { style: { fontSize: fs.footer, color: c.muted } },
+              "Source: Modo Energy ME BESS Indices, trailing 12 months to April 2026 (ERCOT to March 2026); Modo Energy analysis for Germany."),
+            e("p", { style: { fontSize: fs.footer, color: c.muted, marginTop: 2 } },
+              "Note: Balancing markets covers ISO-dispatched real-time products (the GB Balancing Mechanism). CAISO operators also earn bilateral Resource Adequacy payments outside the index. Germany is indicative; no single equivalent index exists."),
+            e("button", {
+              onClick: function() { downloadCSV(data, "cross-market-bess-revenue-mix"); },
+              style: {
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: fs.footer,
+                fontWeight: 500,
+                color: c.accent,
+                background: "none",
+                border: "none",
+                outline: "none",
+                boxShadow: "none",
+                padding: 0,
+                cursor: "pointer",
+                marginTop: 4,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4
+              }
+            },
+              e("svg", {
+                width: 12, height: 12, viewBox: "0 0 24 24",
+                fill: "none", stroke: "currentColor",
+                strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round",
+                "aria-hidden": true
+              },
+                e("path", { d: "M12 4v14m0 0l-6-6m6 6l6-6" })
+              ),
+              "Download data"
+            )
+          ),
+          e("span", {
+            style: {
+              fontSize: fs.wordmark,
+              fontWeight: 700,
+              letterSpacing: "0.25em",
+              color: c.text,
+              whiteSpace: "nowrap",
+              alignSelf: mob ? "flex-end" : "auto"
+            }
+          }, "MODOENERGY")
+        )
+      );
+    }
+
+    (function() {
+      var rendered = false;
+      var observer = new IntersectionObserver(function(entries) {
+        if (entries[0].isIntersecting && !rendered) {
+          rendered = true;
+          observer.disconnect();
+          ReactDOM.createRoot(document.getElementById('root')).render(e(ModoChart));
+        }
+      }, { threshold: 0.1 });
+      observer.observe(document.getElementById('root'));
+    })();
+  </script>
+</body>
+</html>

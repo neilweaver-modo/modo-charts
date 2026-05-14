@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ancillary share of BESS revenue over time</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.12.7/Recharts.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --dm-bg: #FFFFFF; --dm-text: #333333; --dm-text2: #4a4a4a;
+      --dm-muted: #AAAAAA; --dm-border: #E8E8E8; --dm-grid: #F0F0F0;
+      --dm-tooltip-bg: #333333; --dm-tooltip-text: #FFFFFF; --dm-accent: #6F5FE5;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --dm-bg: #1a1a1a; --dm-text: #d4d4d4; --dm-text2: #a0a0a0;
+        --dm-muted: #888888; --dm-border: #2e2e2e; --dm-grid: #2e2e2e;
+        --dm-tooltip-bg: #2a2a2a; --dm-tooltip-text: #d4d4d4; --dm-accent: #B7AFF2;
+      }
+    }
+    html, body { width: 100%; height: 100%; overflow: hidden;
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--dm-bg); color: var(--dm-text); }
+    #root { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    const { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceDot } = Recharts;
+    var e = React.createElement;
+    var useState = React.useState;
+    var useEffect = React.useEffect;
+
+    function useDarkMode() {
+      var s = useState(window.matchMedia('(prefers-color-scheme: dark)').matches);
+      var dark = s[0]; var setDark = s[1];
+      useEffect(function() {
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        function onChange(ev) { setDark(ev.matches); }
+        mq.addEventListener('change', onChange);
+        return function() { mq.removeEventListener('change', onChange); };
+      }, []);
+      return dark;
+    }
+    function useWindowSize() {
+      var s = useState({ width: window.innerWidth, height: window.innerHeight });
+      var size = s[0]; var setSize = s[1];
+      useEffect(function() {
+        function onResize() { setSize({ width: window.innerWidth, height: window.innerHeight }); }
+        window.addEventListener("resize", onResize);
+        return function() { window.removeEventListener("resize", onResize); };
+      }, []);
+      return size;
+    }
+
+    // === DATA ===
+    // Ancillary services (narrow: frequency, regulation, reserves only) as % of total BESS revenue.
+    // ERCOT / CAISO / GB: computed from monthly ME BESS Indices, annual averages.
+    // Germany: indicative — no single equivalent index.
+    // GB 2024 dip reflects Dynamic Regulation High (DRH) cost burden; PQR/NQR launched late 2024 and ancillary share recovered into 2025.
+    var data = [
+      { year: "2023",    gb: 44, ercot: 71, caiso: 16, germany: 80 },
+      { year: "2024",    gb: 3,  ercot: 47, caiso: 13, germany: 70 },
+      { year: "2025",    gb: 28, ercot: 24, caiso: 10, germany: 60 },
+      { year: "2026 YTD",gb: 22, ercot: 24, caiso: 10, germany: 50 }
+    ];
+
+    var SERIES = [
+      { key: "germany", label: "Germany (indicative)", color: "#A074FB", dashed: true },
+      { key: "ercot",   label: "ERCOT",                color: "#E59C58", dashed: false },
+      { key: "gb",      label: "GB",                   color: "#333333", dashed: false },
+      { key: "caiso",   label: "CAISO",                color: "#467EE4", dashed: false }
+    ];
+
+    function getColors(dark) {
+      return {
+        text: dark ? "#d4d4d4" : "#333333",
+        text2: dark ? "#a0a0a0" : "#4a4a4a",
+        muted: dark ? "#888888" : "#AAAAAA",
+        bg: dark ? "#1a1a1a" : "#FFFFFF",
+        grid: dark ? "#2e2e2e" : "#F0F0F0",
+        border: dark ? "#2e2e2e" : "#E8E8E8",
+        tooltipBg: dark ? "#2a2a2a" : "#333333",
+        tooltipText: dark ? "#d4d4d4" : "#FFFFFF",
+        accent: dark ? "#B7AFF2" : "#6F5FE5",
+        gbLine: dark ? "#d4d4d4" : "#333333"
+      };
+    }
+
+    function downloadCSV(data, filename) {
+      if (!data || !data.length) return;
+      var keys = ["year","gb","ercot","caiso","germany"];
+      var csv = keys.join(',') + '\n';
+      data.forEach(function(row) {
+        csv += keys.map(function(k){
+          var v = row[k];
+          return typeof v === "string" && v.indexOf(",")>=0 ? '"'+v+'"' : v;
+        }).join(',') + '\n';
+      });
+      var blob = new Blob([csv], { type: 'text/csv' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url;
+      a.download = (filename || 'chart-data') + '.csv'; a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function ModoTooltip(props) {
+      if (!props.active || !props.payload || !props.payload.length) return null;
+      var colors = props.colors || getColors(false);
+      // Sort entries descending by value for readability
+      var sorted = props.payload.slice().sort(function(a,b){ return b.value - a.value; });
+      return e("div", {
+        style: { backgroundColor: colors.tooltipBg, padding: "8px 12px", borderRadius: 6,
+          fontFamily: "'DM Sans', sans-serif", maxWidth: 240, border: "1px solid " + colors.border }
+      },
+        e("p", { style: { fontSize: 11, color: colors.muted, marginBottom: 6, fontWeight: 500 } }, props.label),
+        sorted.map(function(entry, i) {
+          return e("p", { key: i, style: { fontSize: 11, color: colors.tooltipText, lineHeight: 1.6 } },
+            e("span", { style: { color: entry.color } }, "● "),
+            entry.name + ": " + entry.value + "%"
+          );
+        })
+      );
+    }
+
+    function ModoChart() {
+      var w = useWindowSize().width;
+      var mob = w < 640;
+      var tab = w >= 640 && w < 1024;
+      var dark = useDarkMode();
+      var c = getColors(dark);
+
+      var hiddenState = useState({});
+      var hidden = hiddenState[0]; var setHidden = hiddenState[1];
+
+      var fs = {
+        header: mob ? 15 : tab ? 18 : 21,
+        sub: mob ? 11 : tab ? 13 : 14,
+        xTick: mob ? 10 : tab ? 11 : 12,
+        yTick: mob ? 9 : tab ? 10 : 11,
+        annotation: mob ? 9 : tab ? 10 : 11,
+        legend: mob ? 10 : tab ? 11 : 12,
+        footer: mob ? 9 : tab ? 10 : 11,
+        wordmark: mob ? 14 : tab ? 18 : 22
+      };
+      var margin = mob ? { top: 30, right: 16, left: 0, bottom: 5 }
+        : tab ? { top: 35, right: 22, left: 5, bottom: 5 }
+        : { top: 40, right: 30, left: 8, bottom: 5 };
+      var pad = mob ? "12px 10px 8px 10px" : tab ? "18px 20px 12px 20px" : "24px 28px 16px 28px";
+
+      function onLegendClick(o) {
+        var k = o && o.dataKey;
+        if (k) { var next = Object.assign({}, hidden); next[k] = !next[k]; setHidden(next); }
+      }
+      function legendFormatter(value, entry) {
+        var k = entry && entry.dataKey;
+        var isHidden = !!(k && hidden[k]);
+        return e("span", {
+          style: { color: isHidden ? c.muted : c.text,
+            textDecoration: isHidden ? "line-through" : "none",
+            cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }
+        }, value);
+      }
+
+      return e("div", {
+        style: { display: "flex", flexDirection: "column", width: "100%", height: "100%",
+          padding: pad, fontFamily: "'DM Sans', sans-serif", background: c.bg }
+      },
+        e("div", { style: { marginBottom: mob ? 4 : 8 } },
+          e("h1", { style: { fontSize: fs.header, fontWeight: 400, color: c.text, lineHeight: 1.3 } },
+            "How is the ancillary share of battery revenue evolving across major markets?"),
+          e("p", { style: { fontSize: fs.sub, color: c.text2, marginTop: mob ? 3 : 6 } },
+            "Ancillary services (frequency, regulation, reserves) as % of total BESS revenue, annual averages")
+        ),
+
+        e("div", { style: { flex: 1, minHeight: 0 } },
+          e(ResponsiveContainer, { width: "100%", height: "100%" },
+            e(LineChart, { data: data, margin: margin },
+              e(CartesianGrid, { horizontal: true, vertical: false, stroke: c.grid }),
+              e(XAxis, { dataKey: "year",
+                tick: { fontSize: fs.xTick, fill: c.text, fontFamily: "'DM Sans', sans-serif" },
+                axisLine: { stroke: c.border }, tickLine: false, padding: { left: 10, right: 10 } }),
+              e(YAxis, {
+                tick: { fontSize: fs.yTick, fill: c.text2, fontFamily: "'DM Sans', sans-serif" },
+                axisLine: false, tickLine: false,
+                domain: [0, 100], ticks: [0, 25, 50, 75, 100],
+                tickFormatter: function(v) { return v + "%"; },
+                width: mob ? 38 : 44 }),
+              e(Tooltip, { content: e(ModoTooltip, { colors: c }),
+                cursor: { stroke: c.muted, strokeWidth: 1, strokeDasharray: "3 3" } }),
+              e(Legend, {
+                verticalAlign: "top", align: "left",
+                iconType: "plainline", iconSize: mob ? 14 : 18,
+                onClick: onLegendClick, formatter: legendFormatter,
+                wrapperStyle: { fontFamily: "'DM Sans', sans-serif",
+                  fontSize: fs.legend, paddingBottom: 14, cursor: "pointer" }
+              }),
+              SERIES.map(function(s) {
+                return e(Line, {
+                  key: s.key,
+                  dataKey: s.key, name: s.label,
+                  type: "linear",
+                  stroke: s.key === "gb" ? (dark ? "#d4d4d4" : "#333333") : s.color,
+                  strokeWidth: 2,
+                  strokeDasharray: s.dashed ? "6 4" : undefined,
+                  dot: { r: 4, fill: s.key === "gb" ? (dark ? "#d4d4d4" : "#333333") : s.color, strokeWidth: 0 },
+                  activeDot: { r: 6 },
+                  hide: !!hidden[s.key],
+                  animationDuration: 800, animationEasing: "ease-in-out"
+                });
+              }),
+              // GB 2024 dip annotation
+              e(ReferenceDot, { x: "2024", y: 3, r: 5,
+                fill: "#E03F61", stroke: c.bg, strokeWidth: 2,
+                ifOverflow: "visible",
+                label: { value: "DRH cost", position: "bottom",
+                  fontSize: fs.annotation, fill: c.text2, fontFamily: "'DM Sans', sans-serif" } })
+            )
+          )
+        ),
+
+        e("div", {
+          style: { display: "flex", justifyContent: "space-between",
+            alignItems: mob ? "flex-start" : "flex-end",
+            flexDirection: mob ? "column" : "row",
+            gap: mob ? 6 : 0, marginTop: 8, paddingTop: 8,
+            borderTop: "1px solid " + c.border }
+        },
+          e("div", { style: { flex: 1 } },
+            e("p", { style: { fontSize: fs.footer, color: c.muted } },
+              "Source: Modo Energy ME BESS Indices (ERCOT, CAISO, GB), monthly values averaged by year; Modo Energy analysis for Germany."),
+            e("p", { style: { fontSize: fs.footer, color: c.muted, marginTop: 2 } },
+              "Note: Ancillary defined narrowly (frequency response, regulation, reserves) — excludes the GB Balancing Mechanism. The GB 2024 figure is net of Dynamic Regulation High (DRH) import costs, which routinely turned the service negative during the product transition (see Modo Energy, 'Dynamic Regulation: Does BM registration impact strategy?', Dec 2023). PQR and NQR launched on 3 December 2024 and ancillary income recovered into 2025."),
+            e("button", {
+              onClick: function() { downloadCSV(data, "ancillary-share-over-time"); },
+              style: { fontFamily: "'DM Sans', sans-serif", fontSize: fs.footer,
+                fontWeight: 500, color: c.accent, background: "none",
+                border: "none", outline: "none", boxShadow: "none",
+                padding: 0, cursor: "pointer", marginTop: 4,
+                display: "inline-flex", alignItems: "center", gap: 4 }
+            },
+              e("svg", { width: 12, height: 12, viewBox: "0 0 24 24",
+                fill: "none", stroke: "currentColor", strokeWidth: 2,
+                strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true },
+                e("path", { d: "M12 4v14m0 0l-6-6m6 6l6-6" })
+              ),
+              "Download data"
+            )
+          ),
+          e("span", {
+            style: { fontSize: fs.wordmark, fontWeight: 700,
+              letterSpacing: "0.25em", color: c.text, whiteSpace: "nowrap",
+              alignSelf: mob ? "flex-end" : "auto" }
+          }, "MODOENERGY")
+        )
+      );
+    }
+
+    (function() {
+      var rendered = false;
+      var observer = new IntersectionObserver(function(entries) {
+        if (entries[0].isIntersecting && !rendered) {
+          rendered = true; observer.disconnect();
+          ReactDOM.createRoot(document.getElementById('root')).render(e(ModoChart));
+        }
+      }, { threshold: 0.1 });
+      observer.observe(document.getElementById('root'));
+    })();
+  </script>
+</body>
+</html>
