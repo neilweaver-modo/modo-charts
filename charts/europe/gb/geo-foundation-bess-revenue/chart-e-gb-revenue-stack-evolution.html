@@ -61,9 +61,10 @@
 
     // === DATA ===
     // GB monthly BESS revenue stack (£/MW/year annualised, 2-hour battery).
-    // Source: Modo Energy ME BESS GB Index.
-    // Streams: wholesale = day-ahead/intraday energy; balancing = BM + imbalance; ancillary = sum of all freq/regulation/reserve products (net of DRH costs); capacity = CM.
-    // Ancillary dips below zero during the GB 2024 DRH cost-burden period; PQR/NQR launched late 2024 and ancillary recovered.
+    // Source: Modo Energy ME BESS GB (2H) Index, fleet-weighted across all qualifying ≥6 MW BMU assets per methodology section 2.3.
+    // Streams: wholesale = day-ahead/intraday energy; balancing = BM + imbalance; ancillary = sum of all frequency/regulation/reserve products on a NET basis (Dynamic Regulation High imports counted as negative because batteries pay to provide the service); capacity = Capacity Market.
+    // The ancillary band dips below zero in Jan/Feb/May/Sep/Nov 2024 because the net DRH cost burden exceeded the positive ancillary services contribution that month. Gross frequency response in 2024 was ~21% of the stack (Modo Energy, Q3 2024 Outlook).
+    // PQR launched 2024-12-03 and ancillary revenue recovered into 2025.
     var data = [
       { date: "Jan '23", wholesale: 43822, balancing: 1917,  ancillary: 35376, capacity: 22121 },
       { date: "Feb '23", wholesale: 30139, balancing: -3485, ancillary: 30231, capacity: 18147 },
@@ -263,9 +264,9 @@
         },
           e("div", { style: { flex: 1 } },
             e("p", { style: { fontSize: fs.footer, color: c.muted } },
-              "Source: Modo Energy ME BESS GB Index (2-hour basis), monthly values annualised in £/MW/year."),
+              "Source: Modo Energy ME BESS GB (2H) Index, fleet-weighted across all qualifying ≥6 MW BMU assets; monthly values annualised in £/MW/year."),
             e("p", { style: { fontSize: fs.footer, color: c.muted, marginTop: 2 } },
-              "Note: Balancing markets covers the GB Balancing Mechanism plus imbalance. Ancillary dips below zero in early 2024 due to Dynamic Regulation High (DRH) cost burden during the product transition; recovery from late 2024 reflects PQR/NQR product launches."),
+              "Note: Balancing markets covers the GB Balancing Mechanism plus imbalance. Ancillary is shown net of Dynamic Regulation High (DRH) import costs — batteries pay to provide DRH, so the service can clear at a net cost. Ancillary dips below zero in Jan/Feb/May/Sep/Nov 2024 when the DRH cost burden exceeded positive ancillary contribution; gross frequency response in 2024 was ~21% of the stack (Modo Energy, Q3 2024 Outlook). PQR launched 3 December 2024 and ancillary recovered into 2025."),
             e("button", {
               onClick: function() { downloadCSV(data, "gb-bess-revenue-stack-evolution"); },
               style: { fontFamily: "'DM Sans', sans-serif", fontSize: fs.footer,
