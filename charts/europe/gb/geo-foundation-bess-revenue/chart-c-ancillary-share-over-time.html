@@ -61,16 +61,19 @@
 
     // === DATA ===
     // Ancillary services (narrow: frequency response, regulation, reserves only) as % of total BESS revenue.
-    // ERCOT / CAISO / GB: computed from ME BESS Indices on a NET annual basis (sum of net ancillary streams / sum of total revenue across the year).
-    // GB values use the ME BESS GB (2H) Index, fleet-weighted across all qualifying ≥6 MW BMU assets per Modo Energy methodology section 2.3.
+    // GB: GROSS positive frequency response share — sum of positive ancillary stream revenues divided by total revenue,
+    //     for the ME BESS GB (2H) Index, fleet-weighted across all qualifying ≥6 MW BMU assets (Modo Energy methodology section 2.3).
+    //     Dynamic Regulation High (DRH) is excluded from positive ancillary when its annual average is negative (2024 onwards),
+    //     because batteries pay to provide DRH during the product transition. The DRH cost burden is shown separately in Chart E.
+    // ERCOT / CAISO: computed on the same gross-positive basis from ME BESS Indices.
     // Germany: indicative — no single equivalent index.
-    // GB 2024 dip reflects net Dynamic Regulation High (DRH) cost burden; gross frequency response was ~21% in 2024 (Modo Energy, Q3 2024 Outlook).
-    // PQR launched 2024-12-03 and ancillary share recovered into 2025.
+    // GB 2024 matches Modo Energy's Q3 2024 Outlook (Bush, 2024): "around 20%" gross frequency response.
+    // PQR launched 2024-12-03 and lifted GB ancillary share into the early 30s in 2025–26.
     var data = [
       { year: "2023",    gb: 46, ercot: 71, caiso: 16, germany: 80 },
-      { year: "2024",    gb: 5,  ercot: 47, caiso: 13, germany: 70 },
-      { year: "2025",    gb: 28, ercot: 24, caiso: 10, germany: 60 },
-      { year: "2026 YTD",gb: 21, ercot: 24, caiso: 10, germany: 50 }
+      { year: "2024",    gb: 21, ercot: 47, caiso: 13, germany: 70 },
+      { year: "2025",    gb: 33, ercot: 24, caiso: 10, germany: 60 },
+      { year: "2026 YTD",gb: 34, ercot: 24, caiso: 10, germany: 50 }
     ];
 
     var SERIES = [
@@ -115,7 +118,6 @@
     function ModoTooltip(props) {
       if (!props.active || !props.payload || !props.payload.length) return null;
       var colors = props.colors || getColors(false);
-      // Sort entries descending by value for readability
       var sorted = props.payload.slice().sort(function(a,b){ return b.value - a.value; });
       return e("div", {
         style: { backgroundColor: colors.tooltipBg, padding: "8px 12px", borderRadius: 6,
@@ -178,7 +180,7 @@
           e("h1", { style: { fontSize: fs.header, fontWeight: 400, color: c.text, lineHeight: 1.3 } },
             "How is the ancillary share of battery revenue evolving across major markets?"),
           e("p", { style: { fontSize: fs.sub, color: c.text2, marginTop: mob ? 3 : 6 } },
-            "Ancillary services (frequency, regulation, reserves) as % of total BESS revenue, annual averages")
+            "Frequency response, regulation, and reserves as % of total BESS revenue, gross positive basis, annual averages")
         ),
 
         e("div", { style: { flex: 1, minHeight: 0 } },
@@ -216,13 +218,7 @@
                   hide: !!hidden[s.key],
                   animationDuration: 800, animationEasing: "ease-in-out"
                 });
-              }),
-              // GB 2024 dip annotation — net of DRH cost burden
-              e(ReferenceDot, { x: "2024", y: 5, r: 5,
-                fill: "#E03F61", stroke: c.bg, strokeWidth: 2,
-                ifOverflow: "visible",
-                label: { value: "Net of DRH cost (gross ~21%)", position: "top",
-                  fontSize: fs.annotation, fill: c.text2, fontFamily: "'DM Sans', sans-serif" } })
+              })
             )
           )
         ),
@@ -238,7 +234,7 @@
             e("p", { style: { fontSize: fs.footer, color: c.muted } },
               "Source: Modo Energy ME BESS Indices (ERCOT, CAISO, GB); Modo Energy analysis for Germany. GB values use the ME BESS GB (2H) Index, fleet-weighted across all qualifying ≥6 MW BMU assets."),
             e("p", { style: { fontSize: fs.footer, color: c.muted, marginTop: 2 } },
-              "Note: Ancillary defined narrowly (frequency response, regulation, reserves) — excludes the GB Balancing Mechanism. Annual share computed as sum of net ancillary stream revenues divided by sum of total revenue. GB 2024 is net of Dynamic Regulation High (DRH) import costs, which routinely turned the service negative during the product transition (see Modo Energy, 'Dynamic Regulation: Does BM registration impact strategy?', Dec 2023); on a gross frequency response basis (DRH cost excluded) the 2024 figure was ~21% — consistent with Modo Energy's Q3 2024 Outlook (Bush, 2024). PQR launched 3 December 2024 and ancillary share recovered into 2025."),
+              "Note: Ancillary defined narrowly (frequency response, regulation, reserves) — excludes the GB Balancing Mechanism. Annual share computed on a gross positive basis: sum of positive ancillary stream revenues divided by sum of total revenue. GB 2024 of 21% matches Modo Energy's Q3 2024 Outlook (Bush, 2024). Dynamic Regulation High (DRH) clears at a net cost to providers from late 2023 onwards and is excluded when negative; the DRH cost burden is shown separately in the monthly stack in Chart E. PQR launched 3 December 2024 and lifted GB ancillary share into the early 30s in 2025–26."),
             e("button", {
               onClick: function() { downloadCSV(data, "ancillary-share-over-time"); },
               style: { fontFamily: "'DM Sans', sans-serif", fontSize: fs.footer,
