@@ -143,14 +143,19 @@
         : { top: 55, right: 16, left: 8, bottom: 40 };
       var pad = mob ? "12px 10px 8px 10px" : tab ? "18px 20px 12px 20px" : "24px 28px 16px 28px";
 
-      // Custom label rendering above each bar (main value + sub-annotation)
+      // Custom label rendering above each bar (main value + sub-annotation).
+      // Both lines stack ABOVE the bar top: main on top, sub just below main, then bar.
+      // Uncleared bars (value=0) anchor at the baseline; same stacking applies.
       function renderBarLabel(props) {
         var d = data[props.index];
+        if (!d) return null;
         var x = props.x + props.width / 2;
-        var topY = d.cleared ? props.y - 6 : props.y - 20;
-        return e("g", null,
+        var gap = 2;
+        var subY = d.cleared ? props.y - 8 : props.y - 8;
+        var mainY = subY - fs.labelSub - gap;
+        return e("g", { key: "lbl-" + props.index },
           e("text", {
-            x: x, y: topY,
+            x: x, y: mainY,
             textAnchor: "middle",
             fontSize: fs.labelMain,
             fill: d.cleared ? c.text : c.text2,
@@ -158,7 +163,7 @@
             fontFamily: "'DM Sans', sans-serif"
           }, d.label),
           e("text", {
-            x: x, y: topY + fs.labelMain + 2,
+            x: x, y: subY,
             textAnchor: "middle",
             fontSize: fs.labelSub,
             fill: c.muted,
@@ -209,7 +214,7 @@
               e(Bar, { dataKey: "value",
                 radius: [2, 2, 0, 0],
                 animationDuration: 800, animationEasing: "ease-in-out",
-                label: renderBarLabel },
+                isAnimationActive: true },
                 data.map(function(entry, i) {
                   var fillColor;
                   if (!entry.cleared) { fillColor = c.pendingFill; }
@@ -220,7 +225,8 @@
                     stroke: entry.cleared ? "none" : c.muted,
                     strokeDasharray: entry.cleared ? "0" : "3 3"
                   });
-                })
+                }),
+                e(LabelList, { dataKey: "value", content: renderBarLabel, position: "top" })
               )
             )
           )

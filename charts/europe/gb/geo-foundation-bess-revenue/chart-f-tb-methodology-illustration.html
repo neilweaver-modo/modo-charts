@@ -204,11 +204,11 @@
                 ifOverflow: "visible",
                 label: { value: "TB1 top  £180", position: "top",
                   fontSize: fs.annotation, fill: c.text, fontFamily: "'DM Sans', sans-serif" } }),
-              // TB1 min dot (13:00, £8)
+              // TB1 min dot (13:00, £8) — label sits above the dot to avoid colliding with the x-axis
               e(ReferenceDot, { x: 13, y: 8, r: 5,
                 fill: "#467EE4", stroke: c.bg, strokeWidth: 2,
                 ifOverflow: "visible",
-                label: { value: "TB1 bottom  £8", position: "bottom",
+                label: { value: "TB1 bottom  £8", position: "top",
                   fontSize: fs.annotation, fill: c.text, fontFamily: "'DM Sans', sans-serif" } })
             )
           )
