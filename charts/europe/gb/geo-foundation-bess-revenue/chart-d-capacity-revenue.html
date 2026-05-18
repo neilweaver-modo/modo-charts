@@ -32,7 +32,7 @@
 <body>
   <div id="root"></div>
   <script>
-    const { ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, LabelList } = Recharts;
+    const { ResponsiveContainer, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, LabelList, Customized } = Recharts;
     var e = React.createElement;
     var useState = React.useState;
     var useEffect = React.useEffect;
@@ -138,38 +138,43 @@
         footer: mob ? 9 : tab ? 10 : 11,
         wordmark: mob ? 14 : tab ? 18 : 22
       };
-      var margin = mob ? { top: 40, right: 8, left: 0, bottom: 30 }
-        : tab ? { top: 50, right: 12, left: 5, bottom: 35 }
-        : { top: 55, right: 16, left: 8, bottom: 40 };
+      var margin = mob ? { top: 50, right: 8, left: 0, bottom: 5 }
+        : tab ? { top: 60, right: 12, left: 5, bottom: 10 }
+        : { top: 65, right: 16, left: 8, bottom: 10 };
       var pad = mob ? "12px 10px 8px 10px" : tab ? "18px 20px 12px 20px" : "24px 28px 16px 28px";
 
       // Custom label rendering above each bar (main value + sub-annotation).
+      // Implemented as a Recharts Customized component that reads chart-internal
+      // bar coordinates so labels position reliably across viewports.
       // Both lines stack ABOVE the bar top: main on top, sub just below main, then bar.
-      // Uncleared bars (value=0) anchor at the baseline; same stacking applies.
-      function renderBarLabel(props) {
-        var d = data[props.index];
-        if (!d) return null;
-        var x = props.x + props.width / 2;
-        var gap = 2;
-        var subY = d.cleared ? props.y - 8 : props.y - 8;
-        var mainY = subY - fs.labelSub - gap;
-        return e("g", { key: "lbl-" + props.index },
-          e("text", {
-            x: x, y: mainY,
-            textAnchor: "middle",
-            fontSize: fs.labelMain,
-            fill: d.cleared ? c.text : c.text2,
-            fontWeight: 500,
-            fontFamily: "'DM Sans', sans-serif"
-          }, d.label),
-          e("text", {
-            x: x, y: subY,
-            textAnchor: "middle",
-            fontSize: fs.labelSub,
-            fill: c.muted,
-            fontFamily: "'DM Sans', sans-serif"
-          }, d.sub)
-        );
+      function CustomBarLabels(cp) {
+        var items = cp && cp.formattedGraphicalItems && cp.formattedGraphicalItems[0];
+        if (!items || !items.props || !items.props.data) return null;
+        var bars = items.props.data;
+        return e("g", { className: "modo-bar-labels" }, bars.map(function(bar, i) {
+          var d = data[i]; if (!d) return null;
+          var x = bar.x + bar.width / 2;
+          // For uncleared bars (value 0) bar.y sits at the baseline; main label still hangs above it.
+          var subY = bar.y - 8;
+          var mainY = subY - fs.labelSub - 2;
+          return e("g", { key: "lbl-" + i },
+            e("text", {
+              x: x, y: mainY,
+              textAnchor: "middle",
+              fontSize: fs.labelMain,
+              fill: d.cleared ? c.text : c.text2,
+              fontWeight: 500,
+              fontFamily: "'DM Sans', sans-serif"
+            }, d.label),
+            e("text", {
+              x: x, y: subY,
+              textAnchor: "middle",
+              fontSize: fs.labelSub,
+              fill: c.muted,
+              fontFamily: "'DM Sans', sans-serif"
+            }, d.sub)
+          );
+        }));
       }
 
       function renderXTick(props) {
@@ -225,13 +230,9 @@
                     stroke: entry.cleared ? "none" : c.muted,
                     strokeDasharray: entry.cleared ? "0" : "3 3"
                   });
-                }).concat([
-                  e(LabelList, { key: "main-lbl", dataKey: "label", position: "top", offset: 22,
-                    fontSize: fs.labelMain, fill: c.text, fontFamily: "'DM Sans', sans-serif" }),
-                  e(LabelList, { key: "sub-lbl", dataKey: "sub", position: "top", offset: 6,
-                    fontSize: fs.labelSub, fill: c.muted, fontFamily: "'DM Sans', sans-serif" })
-                ])
-              )
+                })
+              ),
+              e(Customized, { component: CustomBarLabels })
             )
           )
         ),
