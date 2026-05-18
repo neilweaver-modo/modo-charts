@@ -225,8 +225,12 @@
                     stroke: entry.cleared ? "none" : c.muted,
                     strokeDasharray: entry.cleared ? "0" : "3 3"
                   });
-                }),
-                e(LabelList, { dataKey: "value", content: renderBarLabel, position: "top" })
+                }).concat([
+                  e(LabelList, { key: "main-lbl", dataKey: "label", position: "top", offset: 22,
+                    fontSize: fs.labelMain, fill: c.text, fontFamily: "'DM Sans', sans-serif" }),
+                  e(LabelList, { key: "sub-lbl", dataKey: "sub", position: "top", offset: 6,
+                    fontSize: fs.labelSub, fill: c.muted, fontFamily: "'DM Sans', sans-serif" })
+                ])
               )
             )
           )
